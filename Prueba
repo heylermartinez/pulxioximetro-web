@@ -1,0 +1,168 @@
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitoreo Multipaciente con Bluetooth</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+    }
+    header {
+      text-align: center;
+      padding: 10px;
+      background: #007bff;
+      color: white;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .patient-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+      padding: 15px;
+    }
+    button {
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .history-container {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #007bff;
+      color: white;
+      position: sticky;
+      top: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🔵 Monitoreo de Pulsioximetría vía Bluetooth</h1>
+    <p>Conexión directa al reloj inteligente</p>
+  </header>
+
+  <div class="patient-card" id="patient">
+    <h2>👤 Paciente Reloj LT716</h2>
+    <button id="connectBtn">Conectar al reloj</button>
+    <canvas id="chart" height="200"></canvas>
+    <h3>📋 Historial</h3>
+    <div class="history-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Hora</th>
+            <th>Pulso (BPM)</th>
+          </tr>
+        </thead>
+        <tbody id="history"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let chart;
+
+    function initChart() {
+      let ctx = document.getElementById("chart").getContext("2d");
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [
+            { label: "Pulso (BPM)", borderColor: "red", data: [], fill: false }
+          ]
+        }
+      });
+    }
+
+    async function connectToWatch() {
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['heart_rate']
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('heart_rate');
+        const characteristic = await service.getCharacteristic('heart_rate_measurement');
+
+        characteristic.startNotifications();
+        characteristic.addEventListener('characteristicvaluechanged', event => {
+          let value = event.target.value;
+          let heartRate = value.getUint8(1); // lectura básica
+          updateData(heartRate);
+        });
+
+        document.getElementById("connectBtn").innerText = "✅ Conectado";
+
+      } catch (error) {
+        alert("Error al conectar: " + error);
+      }
+    }
+
+    function updateData(bpm) {
+      let time = new Date().toLocaleTimeString();
+
+      // Actualizar gráfica
+      chart.data.labels.push(time);
+      chart.data.datasets[0].data.push(bpm);
+
+      if (chart.data.labels.length > 20) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+      }
+      chart.update();
+
+      // Agregar a historial
+      let table = document.getElementById("history");
+
+      for (let r of table.rows) {
+        r.style.backgroundColor = "";
+        r.style.fontWeight = "normal";
+        r.style.textDecoration = "none";
+      }
+
+      let row = table.insertRow();
+      row.insertCell(0).innerText = time;
+      row.insertCell(1).innerText = bpm;
+
+      row.style.backgroundColor = "#e6f7ff";
+      row.style.fontWeight = "bold";
+      row.style.textDecoration = "underline";
+    }
+
+    document.getElementById("connectBtn").addEventListener("click", connectToWatch);
+
+    initChart();
+  </script>
+
+</body>
+</html>
