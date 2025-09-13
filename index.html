@@ -2,7 +2,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monitoreo Multipaciente con Bluetooth</title>
+  <title>Monitoreo Multipaciente con Identificación</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -19,6 +19,14 @@
       border-radius: 8px;
       margin-bottom: 20px;
     }
+    .patient-form {
+      text-align: center;
+      margin-bottom: 20px;
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
     .patient-card {
       background: white;
       border-radius: 12px;
@@ -26,14 +34,27 @@
       margin-bottom: 30px;
       padding: 15px;
     }
-    button {
-      background: #28a745;
-      color: white;
-      border: none;
+    .btn {
       padding: 8px 12px;
       border-radius: 6px;
+      border: none;
       cursor: pointer;
-      margin-bottom: 10px;
+      margin: 5px;
+    }
+    .stop-btn {
+      background: #dc3545;
+      color: white;
+    }
+    .stop-btn:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+    .delete-btn {
+      background: #343a40;
+      color: white;
+    }
+    canvas {
+      max-width: 100%;
     }
     .history-container {
       max-height: 200px;
@@ -60,108 +81,184 @@
       position: sticky;
       top: 0;
     }
+    .info {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>🔵 Monitoreo de Pulsioximetría vía Bluetooth</h1>
-    <p>Conexión directa al reloj inteligente</p>
+    <h1>Monitoreo de Pulsioximetría</h1>
+    <p>Varios pacientes en tiempo real (detener + eliminar con descarga CSV)</p>
   </header>
 
-  <div class="patient-card" id="patient">
-    <h2>👤 Paciente Reloj LT716</h2>
-    <button id="connectBtn">Conectar al reloj</button>
-    <canvas id="chart" height="200"></canvas>
-    <h3>📋 Historial</h3>
-    <div class="history-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Hora</th>
-            <th>Pulso (BPM)</th>
-          </tr>
-        </thead>
-        <tbody id="history"></tbody>
-      </table>
-    </div>
+  <!-- Formulario para registrar paciente -->
+  <div class="patient-form">
+    <h2>Registrar nuevo paciente</h2>
+    <input type="text" id="name" placeholder="Nombre completo"> 
+    <input type="text" id="id" placeholder="Documento o ID"> 
+    <input type="number" id="age" placeholder="Edad"> 
+    <select id="sex">
+      <option value="">Sexo</option>
+      <option value="Masculino">Masculino</option>
+      <option value="Femenino">Femenino</option>
+    </select>
+    <button onclick="addPatient()">Agregar Paciente</button>
   </div>
 
-  <script>
-    let chart;
+  <!-- Aquí aparecerán los pacientes -->
+  <div id="patientsContainer"></div>
 
-    function initChart() {
-      let ctx = document.getElementById("chart").getContext("2d");
-      chart = new Chart(ctx, {
+  <script>
+    let patients = [];
+
+    function addPatient() {
+      let name = document.getElementById("name").value.trim();
+      let id = document.getElementById("id").value.trim();
+      let age = document.getElementById("age").value.trim();
+      let sex = document.getElementById("sex").value;
+
+      if (!name || !id || !age || !sex) {
+        return alert("Por favor completa todos los campos");
+      }
+
+      // Crear contenedor para el paciente
+      let container = document.createElement("div");
+      container.className = "patient-card";
+      container.id = `card_${id}`;
+      container.innerHTML = `
+        <h2>👤 ${name}</h2>
+        <p class="info">🆔 ID: ${id} | 🎂 Edad: ${age} | 👤 Sexo: ${sex}</p>
+        <button class="btn stop-btn" onclick="stopMonitoring('${id}')">⛔ Detener</button>
+        <button class="btn delete-btn" onclick="deletePatient('${id}', '${name}')">🗑️ Eliminar</button>
+        <canvas id="chart_${id}" height="200"></canvas>
+        <h3>📋 Historial</h3>
+        <div class="history-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Hora</th>
+                <th>SpO₂ (%)</th>
+                <th>Pulso (BPM)</th>
+              </tr>
+            </thead>
+            <tbody id="table_${id}"></tbody>
+          </table>
+        </div>
+      `;
+      document.getElementById("patientsContainer").appendChild(container);
+
+      // Crear gráfica para este paciente
+      let ctx = document.getElementById(`chart_${id}`).getContext("2d");
+      let chart = new Chart(ctx, {
         type: "line",
         data: {
           labels: [],
           datasets: [
+            { label: "SpO₂ (%)", borderColor: "blue", data: [], fill: false },
             { label: "Pulso (BPM)", borderColor: "red", data: [], fill: false }
           ]
         }
       });
+
+      // Guardar paciente en lista con estado activo
+      patients.push({ id, name, chart, active: true });
+      
+      // Limpiar formulario
+      document.getElementById("name").value = "";
+      document.getElementById("id").value = "";
+      document.getElementById("age").value = "";
+      document.getElementById("sex").value = "";
     }
 
-    async function connectToWatch() {
-      try {
-        const device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: ['heart_rate']
-        });
-
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService('heart_rate');
-        const characteristic = await service.getCharacteristic('heart_rate_measurement');
-
-        characteristic.startNotifications();
-        characteristic.addEventListener('characteristicvaluechanged', event => {
-          let value = event.target.value;
-          let heartRate = value.getUint8(1); // lectura básica
-          updateData(heartRate);
-        });
-
-        document.getElementById("connectBtn").innerText = "✅ Conectado";
-
-      } catch (error) {
-        alert("Error al conectar: " + error);
+    function stopMonitoring(id) {
+      let patient = patients.find(p => p.id === id);
+      if (patient) {
+        patient.active = false; // desactivar solo este paciente
+        let btn = document.querySelector(`#card_${id} .stop-btn`);
+        btn.innerText = "✅ Detenido";
+        btn.disabled = true;
       }
     }
 
-    function updateData(bpm) {
-      let time = new Date().toLocaleTimeString();
+    function deletePatient(id, name) {
+      // 1️⃣ Exportar historial a CSV antes de eliminar
+      exportHistoryToCSV(id, name);
 
-      // Actualizar gráfica
-      chart.data.labels.push(time);
-      chart.data.datasets[0].data.push(bpm);
+      // 2️⃣ quitar de la lista de pacientes
+      patients = patients.filter(p => p.id !== id);
 
-      if (chart.data.labels.length > 20) {
-        chart.data.labels.shift();
-        chart.data.datasets[0].data.shift();
-      }
-      chart.update();
+      // 3️⃣ eliminar tarjeta del DOM
+      let card = document.getElementById(`card_${id}`);
+      if (card) card.remove();
+    }
 
-      // Agregar a historial
-      let table = document.getElementById("history");
+    function exportHistoryToCSV(id, name) {
+      let table = document.getElementById(`table_${id}`);
+      if (!table) return;
+
+      let rows = [["Hora", "SpO₂ (%)", "Pulso (BPM)"]]; // encabezado
 
       for (let r of table.rows) {
-        r.style.backgroundColor = "";
-        r.style.fontWeight = "normal";
-        r.style.textDecoration = "none";
+        let row = [];
+        for (let cell of r.cells) {
+          row.push(cell.innerText);
+        }
+        rows.push(row);
       }
 
-      let row = table.insertRow();
-      row.insertCell(0).innerText = time;
-      row.insertCell(1).innerText = bpm;
-
-      row.style.backgroundColor = "#e6f7ff";
-      row.style.fontWeight = "bold";
-      row.style.textDecoration = "underline";
+      let csvContent = rows.map(e => e.join(",")).join("\n");
+      let blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      let link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `Historial_${name}_${id}.csv`;
+      link.click();
     }
 
-    document.getElementById("connectBtn").addEventListener("click", connectToWatch);
+    // 🔹 Simulación: genera datos para pacientes activos
+    setInterval(() => {
+      let time = new Date().toLocaleTimeString();
+      patients.forEach(p => {
+        if (!p.active) return; // ignorar pacientes detenidos
 
-    initChart();
+        let spo2 = 95 + Math.floor(Math.random() * 5);
+        let bpm = 70 + Math.floor(Math.random() * 15);
+
+        // Actualizar gráfica
+        p.chart.data.labels.push(time);
+        p.chart.data.datasets[0].data.push(spo2);
+        p.chart.data.datasets[1].data.push(bpm);
+
+        if (p.chart.data.labels.length > 20) {
+          p.chart.data.labels.shift();
+          p.chart.data.datasets[0].data.shift();
+          p.chart.data.datasets[1].data.shift();
+        }
+        p.chart.update();
+
+        // Quitar resaltado anterior
+        let table = document.getElementById(`table_${p.id}`);
+        for (let r of table.rows) {
+          r.style.backgroundColor = "";
+          r.style.fontWeight = "normal";
+          r.style.textDecoration = "none";
+        }
+
+        // Insertar nueva fila
+        let row = table.insertRow();
+        row.insertCell(0).innerText = time;
+        row.insertCell(1).innerText = spo2;
+        row.insertCell(2).innerText = bpm;
+
+        // Resaltar último dato
+        row.style.backgroundColor = "#e6f7ff";
+        row.style.fontWeight = "bold";
+        row.style.textDecoration = "underline";
+      });
+    }, 1000);
   </script>
 
 </body>
