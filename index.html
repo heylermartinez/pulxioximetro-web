@@ -1,106 +1,212 @@
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monitoreo Multipaciente con Identificación</title>
+  <title>Monitoreo Hospitalario - Simulación</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
-      margin: 0;
-      padding: 20px;
+    :root {
+      --bg-dark: #0e141a;
+      --card-bg: #161d25;
+      --text-light: #e0e6ed;
+      --gray: #a0aab5;
+      --border: #2a333d;
+      --danger: #ff4c4c;
+      --success: #00e676;
+      --accent: #3a8ef6;
     }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+      padding: 15px;
+      min-height: 100vh;
+    }
+
     header {
       text-align: center;
-      padding: 10px;
-      background: #007bff;
-      color: white;
-      border-radius: 8px;
-      margin-bottom: 20px;
+      margin-bottom: 25px;
+      padding: 15px;
+      background: linear-gradient(135deg, #1c2633, #2a3a4c);
+      color: var(--text-light);
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
     }
+
+    header h1 {
+      font-size: 22px;
+      margin-bottom: 6px;
+      color: var(--success);
+      letter-spacing: 0.5px;
+    }
+
+    header p {
+      font-size: 13px;
+      color: var(--gray);
+    }
+
+    .connection-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+
+    .connection-status span {
+      color: var(--success);
+      font-weight: 600;
+    }
+
     .patient-form {
-      text-align: center;
-      margin-bottom: 20px;
-      background: white;
-      padding: 15px;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 25px;
     }
-    .patient-card {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      margin-bottom: 30px;
-      padding: 15px;
+
+    .patient-form h2 {
+      font-size: 16px;
+      margin-bottom: 15px;
+      color: var(--accent);
     }
-    .btn {
-      padding: 8px 12px;
+
+    .patient-form input,
+    .patient-form select {
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 8px 10px;
       border-radius: 6px;
+      border: 1px solid var(--border);
+      background-color: #0e141a;
+      color: var(--text-light);
+      font-size: 13px;
+    }
+
+    .patient-form button {
+      background: var(--accent);
+      color: white;
       border: none;
+      padding: 8px 15px;
+      border-radius: 6px;
+      font-size: 13px;
       cursor: pointer;
-      margin: 5px;
+      transition: 0.2s;
     }
-    .stop-btn {
-      background: #dc3545;
-      color: white;
+
+    .patient-form button:hover {
+      background: #5597f9;
     }
-    .stop-btn:disabled {
-      background: #6c757d;
-      cursor: not-allowed;
+
+    .patient-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 25px;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+      padding: 18px;
+      font-size: 13px;
     }
-    .delete-btn {
-      background: #343a40;
-      color: white;
+
+    .patient-card h2 {
+      font-size: 17px;
+      margin-bottom: 5px;
+      color: var(--text-light);
+      font-weight: 600;
     }
+
+    .patient-card .info {
+      color: var(--gray);
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 6px;
+      padding: 5px 10px;
+      margin-right: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .stop-btn { background-color: var(--success); color: #0e141a; font-weight: bold; }
+    .delete-btn { background-color: var(--danger); color: white; }
+    .export-btn { background-color: var(--accent); color: white; }
+
+    .btn:hover { transform: scale(1.05); }
+
     canvas {
-      max-width: 100%;
-    }
-    .history-container {
-      max-height: 200px;
-      overflow-y: auto;
+      width: 100%;
+      height: 180px !important;
       margin-top: 10px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
+      background-color: #0e141a;
+      border-radius: 6px;
     }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      background: white;
+      font-size: 12px;
     }
-    table, th, td {
-      border: 1px solid #ddd;
-    }
-    th, td {
-      padding: 8px;
-      text-align: center;
-    }
+
     th {
-      background: #007bff;
-      color: white;
-      position: sticky;
-      top: 0;
+      background: #222b35;
+      color: var(--text-light);
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
     }
-    .info {
+
+    td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-light);
+    }
+
+    tbody tr:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .history-container {
+      max-height: 160px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+
+    h3 {
+      color: var(--accent);
       font-size: 14px;
-      color: #333;
-      margin-bottom: 10px;
+      margin-top: 15px;
+      margin-bottom: 5px;
     }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>Monitoreo de Pulsioximetría</h1>
-    <p>Varios pacientes en tiempo real (detener + eliminar con descarga CSV)</p>
+    <h1>🩺 Monitoreo de Pacientes</h1>
+    <p>Simulación hospitalaria en tiempo real</p>
   </header>
 
-  <!-- Formulario para registrar paciente -->
+  <div class="connection-status">
+    <span>🟢 Simulación Activa</span>
+  </div>
+
   <div class="patient-form">
-    <h2>Registrar nuevo paciente</h2>
-    <input type="text" id="name" placeholder="Nombre completo"> 
-    <input type="text" id="id" placeholder="Documento o ID"> 
-    <input type="number" id="age" placeholder="Edad"> 
+    <h2>Registrar Nuevo Paciente</h2>
+    <input type="text" id="name" placeholder="Nombre completo">
+    <input type="text" id="id" placeholder="Documento o ID">
+    <input type="number" id="age" placeholder="Edad">
     <select id="sex">
       <option value="">Sexo</option>
       <option value="Masculino">Masculino</option>
@@ -109,7 +215,6 @@
     <button onclick="addPatient()">Agregar Paciente</button>
   </div>
 
-  <!-- Aquí aparecerán los pacientes -->
   <div id="patientsContainer"></div>
 
   <script>
@@ -125,25 +230,21 @@
         return alert("Por favor completa todos los campos");
       }
 
-      // Crear contenedor para el paciente
       let container = document.createElement("div");
       container.className = "patient-card";
       container.id = `card_${id}`;
       container.innerHTML = `
         <h2>👤 ${name}</h2>
         <p class="info">🆔 ID: ${id} | 🎂 Edad: ${age} | 👤 Sexo: ${sex}</p>
-        <button class="btn stop-btn" onclick="stopMonitoring('${id}')">⛔ Detener</button>
+        <button class="btn stop-btn" onclick="toggleMonitoring('${id}')">⛔ Detener</button>
+        <button class="btn export-btn" onclick="exportHistoryToCSV('${id}', '${name}')">🧾 Exportar CSV</button>
         <button class="btn delete-btn" onclick="deletePatient('${id}', '${name}')">🗑️ Eliminar</button>
-        <canvas id="chart_${id}" height="200"></canvas>
-        <h3>📋 Historial</h3>
+        <canvas id="chart_${id}" height="150"></canvas>
+        <h3>Historial</h3>
         <div class="history-container">
           <table>
             <thead>
-              <tr>
-                <th>Hora</th>
-                <th>SpO₂ (%)</th>
-                <th>Pulso (BPM)</th>
-              </tr>
+              <tr><th>Hora</th><th>SpO₂ (%)</th><th>Pulso (BPM)</th></tr>
             </thead>
             <tbody id="table_${id}"></tbody>
           </table>
@@ -151,62 +252,56 @@
       `;
       document.getElementById("patientsContainer").appendChild(container);
 
-      // Crear gráfica para este paciente
       let ctx = document.getElementById(`chart_${id}`).getContext("2d");
       let chart = new Chart(ctx, {
         type: "line",
         data: {
           labels: [],
           datasets: [
-            { label: "SpO₂ (%)", borderColor: "blue", data: [], fill: false },
-            { label: "Pulso (BPM)", borderColor: "red", data: [], fill: false }
+            { label: "SpO₂ (%)", borderColor: "#00e676", pointBackgroundColor: "#00e676", borderWidth: 2, data: [], fill: false },
+            { label: "Pulso (BPM)", borderColor: "#ff4c4c", pointBackgroundColor: "#ff4c4c", borderWidth: 2, data: [], fill: false }
           ]
+        },
+        options: {
+          plugins: { legend: { labels: { color: "#e0e6ed", font: { size: 11 } } } },
+          scales: {
+            x: { ticks: { color: "#a0aab5" }, grid: { color: "#2a333d" } },
+            y: { ticks: { color: "#a0aab5" }, grid: { color: "#2a333d" } }
+          }
         }
       });
 
-      // Guardar paciente en lista con estado activo
       patients.push({ id, name, chart, active: true });
-      
-      // Limpiar formulario
       document.getElementById("name").value = "";
       document.getElementById("id").value = "";
       document.getElementById("age").value = "";
       document.getElementById("sex").value = "";
     }
 
-    function stopMonitoring(id) {
+    function toggleMonitoring(id) {
       let patient = patients.find(p => p.id === id);
-      if (patient) {
-        patient.active = false; // desactivar solo este paciente
-        let btn = document.querySelector(`#card_${id} .stop-btn`);
-        btn.innerText = "✅ Detenido";
-        btn.disabled = true;
+      if (!patient) return;
+      let btn = document.querySelector(`#card_${id} .stop-btn`);
+
+      if (patient.active) {
+        patient.active = false;
+        btn.innerText = "▶️ Reanudar";
+        btn.style.backgroundColor = "#f6c343";
+      } else {
+        patient.active = true;
+        btn.innerText = "⛔ Detener";
+        btn.style.backgroundColor = "var(--success)";
       }
-    }
-
-    function deletePatient(id, name) {
-      // 1️⃣ Exportar historial a CSV antes de eliminar
-      exportHistoryToCSV(id, name);
-
-      // 2️⃣ quitar de la lista de pacientes
-      patients = patients.filter(p => p.id !== id);
-
-      // 3️⃣ eliminar tarjeta del DOM
-      let card = document.getElementById(`card_${id}`);
-      if (card) card.remove();
     }
 
     function exportHistoryToCSV(id, name) {
       let table = document.getElementById(`table_${id}`);
-      if (!table) return;
+      if (!table) return alert("No hay datos para exportar.");
 
-      let rows = [["Hora", "SpO₂ (%)", "Pulso (BPM)"]]; // encabezado
-
+      let rows = [["Hora", "SpO₂ (%)", "Pulso (BPM)"]];
       for (let r of table.rows) {
         let row = [];
-        for (let cell of r.cells) {
-          row.push(cell.innerText);
-        }
+        for (let cell of r.cells) row.push(cell.innerText);
         rows.push(row);
       }
 
@@ -218,16 +313,20 @@
       link.click();
     }
 
-    // 🔹 Simulación: genera datos para pacientes activos
+    function deletePatient(id, name) {
+      patients = patients.filter(p => p.id !== id);
+      let card = document.getElementById(`card_${id}`);
+      if (card) card.remove();
+    }
+
+    // 🔹 Simulación automática
     setInterval(() => {
       let time = new Date().toLocaleTimeString();
       patients.forEach(p => {
-        if (!p.active) return; // ignorar pacientes detenidos
-
+        if (!p.active) return;
         let spo2 = 95 + Math.floor(Math.random() * 5);
         let bpm = 70 + Math.floor(Math.random() * 15);
 
-        // Actualizar gráfica
         p.chart.data.labels.push(time);
         p.chart.data.datasets[0].data.push(spo2);
         p.chart.data.datasets[1].data.push(bpm);
@@ -239,27 +338,19 @@
         }
         p.chart.update();
 
-        // Quitar resaltado anterior
         let table = document.getElementById(`table_${p.id}`);
-        for (let r of table.rows) {
-          r.style.backgroundColor = "";
-          r.style.fontWeight = "normal";
-          r.style.textDecoration = "none";
-        }
-
-        // Insertar nueva fila
-        let row = table.insertRow();
+        let row = table.insertRow(0);
         row.insertCell(0).innerText = time;
         row.insertCell(1).innerText = spo2;
         row.insertCell(2).innerText = bpm;
-
-        // Resaltar último dato
-        row.style.backgroundColor = "#e6f7ff";
+        row.style.backgroundColor = "#1d2833";
         row.style.fontWeight = "bold";
-        row.style.textDecoration = "underline";
       });
     }, 1000);
   </script>
+
+</body>
+</html>
 
 </body>
 </html>
